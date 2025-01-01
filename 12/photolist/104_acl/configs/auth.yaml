@@ -1,5 +1,0 @@
-db:
-  host:     dbMysql:3306
-  username: root
-  password: love
-  database: photolist
