@@ -30,7 +30,7 @@ go run main.go . -f
 	│	├───css
 	│	│	└───body.css (28b)
 	│	├───html
-	│	│	└───index.html (57b)
+	││	└───index.html (57b)
 	│	└───js
 	│		└───site.js (10b)
 	├───zline
