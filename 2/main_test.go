@@ -29,6 +29,7 @@ func TestPipeline(t *testing.T) {
 	freeFlowJobs := []job{
 		job(func(in, out chan interface{}) {
 			out <- 1
+			close(out)
 			time.Sleep(10 * time.Millisecond)
 			currRecieved := atomic.LoadUint32(&recieved)
 			// в чем тут суть
@@ -50,6 +51,7 @@ func TestPipeline(t *testing.T) {
 			for _ = range in {
 				atomic.AddUint32(&recieved, 1)
 			}
+			close(out)
 		}),
 	}
 	ExecutePipeline(freeFlowJobs...)
@@ -127,6 +129,7 @@ func TestSigner(t *testing.T) {
 			for _, fibNum := range inputData {
 				out <- fibNum
 			}
+			close(out)
 		}),
 		job(SingleHash),
 		job(MultiHash),
@@ -138,6 +141,7 @@ func TestSigner(t *testing.T) {
 				t.Error("cant convert result data to string")
 			}
 			testResult = data
+			close(out)
 		}),
 	}
 
