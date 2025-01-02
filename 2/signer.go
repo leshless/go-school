@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	MaxChanLen = 100
-	MaxWorkers = 10
+	MaxWorkers = 7
 )
 
 func SingleHash(in, out chan interface{}) {
@@ -63,24 +62,29 @@ func SingleHash(in, out chan interface{}) {
 	}
 
 	wg.Wait()
-	close(out)
 }
 
 func MultiHash(in, out chan interface{}) {
 	var wg sync.WaitGroup
-
-	hashes := make([]string, 6)
-
+	
 	worker := func() {
 		defer wg.Done()
-
+		
 		var localWG sync.WaitGroup
+		var localMu sync.Mutex
+
+		hashes := make([]string, 6)
 
 		localWorker := func(data interface{}, i int) {
 			defer localWG.Done()
 
 			dataString := fmt.Sprintf("%d%s", i, data.(string))
-			hashes[i] = DataSignerCrc32(dataString)
+			
+			hash := DataSignerCrc32(dataString)
+
+			localMu.Lock()
+			hashes[i] = hash
+			localMu.Unlock()
 		}
 		
 		for data := range in {
@@ -101,17 +105,16 @@ func MultiHash(in, out chan interface{}) {
 	}
 	
 	wg.Wait()
-	close(out)
 }
 
 func CombineResults(in, out chan interface{}) {
-	dataAcc := make([]interface{}, 0, MaxChanLen)
+	dataAcc := make([]interface{}, 0, MaxInputDataLen)
 
 	for data := range in {
 		dataAcc = append(dataAcc, data)
 	}
 
-	dataAccString := make([]string, 0, MaxChanLen)
+	dataAccString := make([]string, 0, MaxInputDataLen)
 	for _, data := range dataAcc {
 		dataAccString = append(dataAccString, data.(string))
 	}
@@ -122,22 +125,30 @@ func CombineResults(in, out chan interface{}) {
 
 
 	out <- strings.Join(dataAccString, "_")
-
-	close(out)
 }
 
 func ExecutePipeline(jobs ...job) {
-	inChan := make(chan interface{}, MaxChanLen)
+	nJobs := len(jobs)
 
-	for _, job := range jobs{
-		outChan := make(chan interface{}, MaxChanLen)
+	var wg sync.WaitGroup
+	wg.Add(nJobs)
 
-		go job(inChan, outChan)
-
-		inChan = outChan
+	chans := make([]chan interface{}, nJobs + 1)
+	for i := 0; i < nJobs + 1; i++ {
+		chans[i] = make(chan interface{}, MaxInputDataLen)
 	}
 
-	for _ = range inChan {
-		// wait until the last channel is closed
+	for i, job := range jobs{
+		i := i
+		job := job
+
+		go func(){
+			defer wg.Done()
+			defer close(chans[i+1])
+			
+			job(chans[i], chans[i+1])
+		}()
 	}
+
+	wg.Wait()
 }
