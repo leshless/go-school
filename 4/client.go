@@ -14,15 +14,14 @@ import (
 
 var (
 	errTest = errors.New("testing")
-	client  = &http.Client{Timeout: time.Second}
 )
 
 type User struct {
-	Id     int
-	Name   string
-	Age    int
-	About  string
-	Gender string
+	Id     int `json:"id"`
+	Name   string `json:"name"`
+	Age    int `json:"age"`
+	About  string `json:"about"`
+	Gender string `json:"gender"`
 }
 
 type SearchResponse struct {
@@ -51,10 +50,22 @@ type SearchRequest struct {
 }
 
 type SearchClient struct {
+	Client *http.Client
 	// токен, по которому происходит авторизация на внешней системе, уходит туда через хедер
 	AccessToken string
 	// урл внешней системы, куда идти
 	URL string
+}
+
+
+func NewSearchClient(accessToken string, url string) *SearchClient{
+	return &SearchClient{
+		Client: &http.Client{
+			Timeout: time.Second,
+		},
+		AccessToken: accessToken,
+		URL: url,
+	}
 }
 
 // FindUsers отправляет запрос во внешнюю систему, которая непосредственно ищет пользоваталей
@@ -84,7 +95,7 @@ func (srv *SearchClient) FindUsers(req SearchRequest) (*SearchResponse, error) {
 	searcherReq, err := http.NewRequest("GET", srv.URL+"?"+searcherParams.Encode(), nil)
 	searcherReq.Header.Add("AccessToken", srv.AccessToken)
 
-	resp, err := client.Do(searcherReq)
+	resp, err := srv.Client.Do(searcherReq)
 	if err != nil {
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			return nil, fmt.Errorf("timeout for %s", searcherParams.Encode())
@@ -122,7 +133,7 @@ func (srv *SearchClient) FindUsers(req SearchRequest) (*SearchResponse, error) {
 		result.NextPage = true
 		result.Users = data[0 : len(data)-1]
 	} else {
-		result.Users = data[0:len(data)]
+		result.Users = data[:]
 	}
 
 	return &result, err
